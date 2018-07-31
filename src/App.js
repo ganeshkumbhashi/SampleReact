@@ -1,14 +1,20 @@
 import React, { Component } from 'react';
+import axios from 'axios';
 //import logo from './logo.svg';
 import './App.css';
 
 //let welcomeMsg = "Welcome to React JS 4";
 
- const name = 'Ganesh';
+ const PATH_BASE = 'https://hn.algolia.com/api/v1';
+ const PATH_SEARCH = '/search';
+ const PARAM_SEARCH = 'query=';
+ const DEFAULT_QUERY = 'redux';
+ const PARAM_PAGE = 'page=';
+ const DEFAULT_HPP = '100';
+ const PARAM_HPP = 'hitsPerPage=';
+ 
 
- const user = {
-   name,
- };
+
 
  const largeColumn = {
    width:'40%',
@@ -24,115 +30,160 @@ import './App.css';
 
 
 
-let list = [
-  {
-    title: 'React',
-    url: 'https://react.com',
-    author: user.name,
-    num_comments: 3,
-    points: 10,
-    objectID: 2
-  },
-  {
-    title: 'Angular',
-    url: 'https://angular.com',
-    author: 'Suresh',
-    num_comments: 3,
-    points: 5,
-    objectID: 3
-  },
-  {
-    title: 'Vue',
-    url: 'https://vue.com',
-    author: 'Ramesh',
-    num_comments: 1,
-    points: 5,
-    objectID: 4
-  }
-];
-
-const isSearched = searchTerm => item => {
- 
-  return item.title.toLowerCase().includes(searchTerm.toLowerCase());
-  
-};
-
 
 
 class App extends Component {
+
+  _isMounted = false;
 
   constructor(props)
   {
     super(props);
     this.state = {
-      list,
-      searchTerm:'',
+      results:null,
+      searchKey:'',
+      searchTerm:DEFAULT_QUERY,
+      error: null,
     };
+  }
+
+  
+  onSearchSubmit = (event) => {
+    const {searchTerm} = this.state;
+    this.setState({
+      searchKey : searchTerm
+    });
+    if(this.needsToSearchTopStories(searchTerm))
+    {
+      this.fetchSearchTopStories(searchTerm);
+    }
+    //event.preventDefault();
+  }
+
+  fetchSearchTopStories = (searchTerm,page=0) => {
+    const surl = `${PATH_BASE}${PATH_SEARCH}?${PARAM_SEARCH}${searchTerm}&${PARAM_PAGE}${page}&${PARAM_HPP}${DEFAULT_HPP}`;
+    console.log("fetchSearchTopStories:"+surl);
 
     
+    axios(surl)
+    .then(result => this._isMounted && this.setSearchTopStories(result.data))
+    .catch(error => this._isMounted && this.setState({
+      error
+    }))
   }
 
   onSearchChange = (event) => {
-    
+    console.log("onSearchChange:"+event.target.value)
     this.setState({
       searchTerm : event.target.value
     });
   }
 
-  
-
   onDismiss = (id) => {
     
+    const {searchKey,results} = this.state;
+    const {hits,page} = results[searchKey];
+
     const isNotId = item => item.objectID !== id;
-
-    const updatedList = this.state.list.filter(isNotId);
-
-    this.setState({list:updatedList});
+    const updatedHits = hits.filter(isNotId);
+    this.setState({
+      results : {
+        ...results,
+        [searchKey]:{
+          hits: updatedHits,
+          page
+        }
+      }
+    });
     
   }
+
+  setSearchTopStories = (result) => {
+    const {hits,page} = result;
+    const {searchKey,results} = this.state;
+    const oldHits = results && results[searchKey] ? results[searchKey].hits : [];
+    const updatedHits = [
+      ...oldHits,
+      ...hits
+    ];
+    this.setState({
+      results : {
+        ...results,
+        [searchKey]:{hits: updatedHits,page}
+      }
+    });
+  }
+
+  componentDidMount(){
+
+    this._isMounted = true;
+
+    const { searchTerm } = this.props;
+    console.log("ComponentDidMount: SearchTerm: "+searchTerm);
+
+    this.setState({
+      searchKey : searchTerm
+    });
+    
+    console.log("componentDidMount:"+searchTerm)
+    this.fetchSearchTopStories(searchTerm);
+
+  }
+
+  componentWillMount(){
+
+    this._isMounted=false;
+
+  }
+
+  needsToSearchTopStories = searchTerm => {
+    return !this.state.results[searchTerm];
+  }
+
 
   render() {
     //var welcomeMsg = "Welcome to React JS";
 
-    const {list, searchTerm} = this.state;
-  
+    const {searchTerm,results,searchKey,error} = this.state;
+    console.log("render:"+searchTerm);
+
+    const page = (results && results[searchKey] && results[searchKey].page) || 0;
+    console.log("page number: "+page);
+
+    const list = (results && results[searchKey] && results[searchKey].hits) || [];
+
   return (
 
       <div className="page">
         <div className="interactions">
-        <Search value={searchTerm} onChange={this.onSearchChange} >
+        <Search value={searchTerm} onChange={this.onSearchChange}  onSubmit={this.onSearchSubmit}>
           Search
         </Search>
         </div>
-
-       
-
-        <Table list={list} pattern={searchTerm} onDismiss={this.onDismiss}/>
+        {
+          error ? <div className="interactions"><p>Something went wrong</p></div> : <Table list={list}  onDismiss={this.onDismiss}/>
+        }
+        <div className="interactions">
+          <Button onClick={() => 
+            this.fetchSearchTopStories(searchKey,page+1)
+          }>More</Button>
+        </div>        
       </div>
-
     );
   }
 }
 
-
-class Search extends Component {
-  render()
-  {
-    const {value,onChange,children} = this.props;
-    return(
-      <form>
-            {children} <input type="text" value={value} onChange={onChange}/>
-      </form>
-    );
-  }
-}
+const Search = ({value,onSubmit,children,onChange}) => <form onSubmit={onSubmit}>
+    <input type="text" value={value} onChange={onChange}/>
+    <button type="submit">{children}</button>
+  </form>
 
 const Button = ({onClick,className='',children}) =>  <button onClick={onClick} className={className} type="button">{children}</button>;
 
-const Table = ({list,pattern,onDismiss}) => 
+const Table = ({list,onDismiss}) => 
   <div className="table">
-    {list.filter(isSearched(pattern)).map(item => 
-      <div key={item.objectID} class="table-row">
+    {list.map(item => 
+      <div key={item.objectID} className="table-row">
         <span style={largeColumn}>
             <a href={item.url}>{item.title}</a>
         </span>
