@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import axios from 'axios';
+import PropTypes from 'prop-types';
 //import logo from './logo.svg';
 import './App.css';
 
@@ -27,10 +28,6 @@ import './App.css';
  const smallColumn = {
    width: '10%',
  };
-
-
-
-
 
 class App extends Component {
 
@@ -178,7 +175,17 @@ const Search = ({value,onSubmit,children,onChange}) => <form onSubmit={onSubmit}
     <button type="submit">{children}</button>
   </form>
 
-const Button = ({onClick,className='',children}) =>  <button onClick={onClick} className={className} type="button">{children}</button>;
+const Button = ({onClick,className,children}) =>  <button onClick={onClick} className={className} type="button">{children}</button>;
+
+Button.PropTypes = {
+  onClick : PropTypes.func.isRequired,
+  className : PropTypes.string,
+  children : PropTypes.node.isRequired,
+};
+
+Button.defaultProps = {
+  className: '',
+}
 
 const Table = ({list,onDismiss}) => 
   <div className="table">
@@ -197,6 +204,27 @@ const Table = ({list,onDismiss}) =>
     )} 
   </div>
 
+  Table.PropTypes = {
+    list: PropTypes.arrayOf(
+      PropTypes.shape({
+        objectID : PropTypes.string.isRequired,
+        author : PropTypes.string,
+        url : PropTypes.string,
+        num_comments : PropTypes.number,
+        points : PropTypes.number,
+      })
+    ).isRequired,
+    onDismiss: PropTypes.func.isRequired,
+  };
+
 
 
 export default App;
+
+export {
+
+  Button,
+  Search,
+  Table,
+
+};
